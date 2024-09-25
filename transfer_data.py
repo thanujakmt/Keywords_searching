@@ -30,14 +30,16 @@ def dump_data_to_new_db(source_engine, target_engine, table_name):
         # Create table with the same schema as in source (adjust as needed)
         create_table_query = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(255),
-            address VARCHAR(255),
-            phone VARCHAR(20)
-            -- Add other columns as needed
+            id INT PRIMARY KEY,
+            websites VARCHAR(255),
+            country VARCHAR(255),
+            niche VARCHAR(50),
+            website_error_flag TINYINT,
+            training_flag TINYINT
         );
         """
         connection.execute(create_table_query)
     
     # Step 3: Insert data into the new database
     data.to_sql(table_name, target_engine, if_exists='append', index=False)
+    
