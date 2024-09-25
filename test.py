@@ -182,8 +182,14 @@ def main():
 
     print(f"Final summary saved to {final_summary_path}")
 
+def delete_unwanted_excel_files(output_folder, summary_file):
+    for file_name in os.listdir(output_folder):
+        file_path = os.path.join(output_folder, file_name)
+        if file_name != summary_file and file_name.endswith('.xlsx'):
+            os.remove(file_path)
+            print(f"Deleted: {file_path}")
+
 if __name__ == '__main__':
     main()
-
-
-
+    summary_file = 'final_keyword_summary.xlsx'
+    delete_unwanted_excel_files(output_folder, summary_file)
