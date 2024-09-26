@@ -1,8 +1,10 @@
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import pandas as pd
 from config import *
 from retry import retry
+
 def get_mysql_connection(user, password, host, database):
     connection_string = f"mysql+pymysql://{user}:{password}@{host}:3306/{database}"
     engine = create_engine(connection_string)
@@ -33,7 +35,8 @@ def dump_data_to_new_db(source_engine, target_engine, destination_table_name,sou
             country VARCHAR(255),
             niche VARCHAR(255),
             website_error_flag TINYINT,
-            training_flag TINYINT
+            training_flag TINYINT,
+            training_check_done_flag TINYINT
         );
         """
         # Wrap the raw SQL in text()
@@ -42,7 +45,6 @@ def dump_data_to_new_db(source_engine, target_engine, destination_table_name,sou
     # Step 3: Insert data into the new database
     data.to_sql(destination_table_name, target_engine, if_exists='append', index=False)
     print("Data dumping done")
-
 
 if __name__ == '__main__':
 

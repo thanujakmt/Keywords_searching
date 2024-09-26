@@ -1,7 +1,7 @@
 
 host = "helenzys-mysql-dev.clyhoefsujtn.us-east-1.rds.amazonaws.com"
 
-niche = "herbal_medicine"
+niche = "aromatherapy"
 
 destination_table_name = f"{niche}_websites"
 
@@ -18,8 +18,5 @@ else:
 target_user = 'htb_websites_db'
 target_password = 'gol)Force72'
 target_database = 'htb_websites_db'
-
-
-
 
 countries = ['usa','au','ca','se','uk','dk','nz','uae']

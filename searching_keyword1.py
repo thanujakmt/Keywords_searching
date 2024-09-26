@@ -11,7 +11,6 @@ import re
 import multiprocessing
 import pandas as pd
 
-
 def save_to_excel(data, url):
     
     filename = url.replace('/','').replace('https','').replace('http','').replace(":",'').replace(".","_")
