@@ -11,48 +11,6 @@ from database_handler import get_website_from_db
 # List of keywords to search for
 keywords = ['course', 'courses', 'training', 'event', 'seminar', 'workshop', 'class', 'classes']
 
-# List of URLs to search
-# urls = [
-#     "http://www.apothecarysuilcrow.com/",
-#     "https://www.sageandstoneapothecaryinc.com/",
-#     "http://aromaleeshop.com/",
-#     "http://www.biotone.com/",
-#     "http://wildwillowholistics.com/",
-#     "https://chthonicstar.com/",
-#     "https://leydenhouse.com/",
-#     "http://wellnessawaits.org/",
-#     "https://www.serenitywellnesscny.com/",
-#     "https://peacefilsagemassage.abmp.com/",
-#     "https://www.gnomelicious.com/",
-#     "http://soapsandsuchalpena.com/",
-#     "http://www.apassionforlife.ca/",
-#     "http://meltcandleshop.com/",
-#     "http://www.pureherbs.com/",
-#     "http://www.shopelementoonline.com/",
-#     "https://www.nationalnutrition.ca/",
-#     "https://nesthamilton.com/",
-#     "https://www.sweetfiretobacco.com/",
-#     "http://www.thisismade.ca/",
-#     "http://www.blackbirdsdaughter.com/",
-#     "http://www.cottonborofarm.com/",
-#     "https://www.kriyatouch.com/",
-#     "https://aromajam.bigcartel.com/",
-#     "http://www.gentlebalancemassage.com/",
-#     "http://www.sonjasecrets.com/",
-#     "http://www.preciousessentials4u.com/",
-#     "http://www.zenfulflamescandles.com/",
-#     "http://www.pillarsofthrow.com/",
-#     "http://melissasbotanicals.com/",
-#     "http://herbalalchemyshop.biz/",
-#     "http://www.sweetmana.com/",
-#     "http://www.dharmaobjects.com/",
-#     "http://www.ladyandthebeard.com/",
-#     "http://ninekeysapothecary.com/",
-#     "http://www.theoasismassage.com/",
-#     "https://www.purelyrelaxation.com/",
-#     "https://www.ultimateintegrativehealth.com/"
-# ]
-
 urls = get_website_from_db()
 
 # Create a folder to store all the Excel files

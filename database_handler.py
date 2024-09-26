@@ -23,7 +23,6 @@ def commit_mysql_query_executer(query):
 
 def get_website_from_db():
     # query = f"select * from {location_table} order by rand() limit 1"
-    query = f"SELECT gl_id,website FROM acupuncturists_websites;"
+    query = f"SELECT gl_id,website FROM acupuncturists_websites order by rand() limit 1;"
     data = fetch_mysql_query_executer(query)
-    urls = [item[1] for item in data]
-    return urls
+    return data[0][1]
