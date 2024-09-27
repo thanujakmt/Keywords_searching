@@ -1,113 +1,142 @@
-
-import os
-import time
+ 
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
-from urllib.parse import urljoin, urlparse
-from multiprocessing import Pool, cpu_count
-from database_handler import get_website_from_db
+import re
+from database_handler import *
+from config import *
+import time
+import retry
 
-# List of keywords to search for
-keywords = ['course', 'courses', 'training', 'event', 'seminar', 'workshop', 'class', 'classes']
+data = get_website_from_db(niche)
+url = data[0][1]
+gl_id = data[0][0]
 
-urls = get_website_from_db()
-
-# Create a folder to store all the Excel files
-output_folder = 'keyword_results_folder'
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
-
-# Function to check for keywords in the website text
-def check_keywords(text):
-    return {keyword: (1 if keyword in text else 0) for keyword in keywords}
-
-# Function to fetch all internal links from a URL
-def get_internal_links(base_url):
-    internal_links = set()
+def check_website(url):
     try:
-        response = requests.get(base_url)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            # Create absolute URL and check if it's internal
-            absolute_url = urljoin(base_url, href)
-            if urlparse(absolute_url).netloc == urlparse(base_url).netloc:
-                internal_links.add(absolute_url)
-    except requests.RequestException as e:
-        print(f"Error fetching internal links from {base_url}: {e}")
-    
-    return internal_links
-
-# Function to handle 429 errors with retries and backoff
-def fetch_with_retry(url, retries=5):
-    for i in range(retries):
-        try:
-            response = requests.get(url)
-            if response.status_code == 429:
-                # Check for the Retry-After header and wait accordingly
-                retry_after = int(response.headers.get("Retry-After", 2))  # Default to 2 seconds if not present
-                print(f"429 Error for {url}. Retrying after {retry_after} seconds...")
-                time.sleep(retry_after)
-                continue  # Retry the request after sleeping
-            response.raise_for_status()
-            return response.text.lower()  # Return the response text
-        except requests.RequestException as e:
-            print(f"Error fetching {url}: {e}")
-            return None
-    return None
-
-# Function to process each URL in parallel
-def process_url(url):
-    internal_links = get_internal_links(url)
-    keyword_results = {}
-    
-    for link in internal_links:
-        text = fetch_with_retry(link)
-        if text:
-            keyword_results[link] = check_keywords(text)
+        response = requests.get(url)
+        time.sleep(5)
+        if response.status_code == 200:
+            print(f"Website {url} is accessible.")
+            return True
         else:
-            keyword_results[link] = {keyword: 0 for keyword in keywords}
+            print(f"Website {url} returned status code {response.status_code}.")
+            return False
+    except requests.exceptions.RequestException as e:
+        print(f"Website {url} is not accessible. Error: {e}")
+        return False
 
-    # Create DataFrame for each website
-    df = pd.DataFrame(keyword_results).T  # Transpose to have links as rows
-    df.index.name = 'Internal Links'
-    
-    # Save to Excel file inside the output folder
-    base_url_name = urlparse(url).netloc.replace('.', '_')
-    file_path = os.path.join(output_folder, f'{base_url_name}_keyword_results.xlsx')
-    df.to_excel(file_path)
+# List of file extensions to exclude
+EXCLUDED_EXTENSIONS = [".pdf", ".jpg", ".zip", ".mp4", ".webp", ".webm", 
+                       ".json", ".xml", ".csv", ".xlsx", ".doc", ".docx", 
+                       ".jpeg", ".png", ".ico", ".css"]
 
-    # Add the summary result for the website
-    overall_status = any(any(count for count in link_info.values()) for link_info in keyword_results.values())
-    return {'Website': url, 'Status': overall_status}
+def get_internal_links(url, domain):
+    # First, check if the website is accessible
+    if not check_website(url):
+        print("Website not accessible. Marking it as such after retries.")
+        # Update the website error flag in the database
+        update_website_error_flag(gl_id=gl_id, niche=niche)
+        return "Website not accessible."
 
-# Main function to handle multiprocessing
-def main():
-    # Use all available CPUs
-    pool_size = cpu_count()
+    retries = 0
+    while retries < 3:
+        try:
+            # Attempt to fetch the website content
+            response = requests.get(url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, 'html.parser')
 
-    with Pool(pool_size) as pool:
-        # Distribute URLs across processes
-        final_results = pool.map(process_url, urls)
+            links = set()
+            for a_tag in soup.find_all('a', href=True):
+                href = a_tag['href']
+                # Ensure it is an internal link (relative or with the same domain)
+                if href.startswith('/') or domain in href:
+                    full_url = requests.compat.urljoin(url, href)  
+                    # Exclude URLs with the listed file extensions
+                    if not any(full_url.endswith(ext) for ext in EXCLUDED_EXTENSIONS):
+                        links.add(full_url)
 
-    # Create final summary DataFrame
-    final_df = pd.DataFrame(final_results)
-    final_summary_path = os.path.join(output_folder, 'final_keyword_summary.xlsx')
-    final_df.to_excel(final_summary_path, index=False)
+            # If links are found, return them
+            print(f"Found internal links: {links}")
+            return links
+        
+        except requests.exceptions.RequestException as e:
+            retries += 1
+            print(f"Error fetching links (attempt {retries}/{3}): {str(e)}")
+            if retries < 3:
+                print(f"Retrying in {5} seconds...")
+                time.sleep(5)  # Wait before retrying
 
-    print(f"Final summary saved to {final_summary_path}")
+    # If we exhaust the retries, return an error and log it
+    print(f"Max retries reached. Unable to access website {url}")
+    update_website_error_flag(gl_id=gl_id, niche=niche)
+    return "Website not accessible after retries."
 
-def delete_unwanted_excel_files(output_folder, summary_file):
-    for file_name in os.listdir(output_folder):
-        file_path = os.path.join(output_folder, file_name)
-        if file_name != summary_file and file_name.endswith('.xlsx'):
-            os.remove(file_path)
-            print(f"Deleted: {file_path}")
+def search_keywords_in_page(url, keywords):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
 
-if __name__ == '__main__':
-    main()
-    summary_file = 'final_keyword_summary.xlsx'
-    delete_unwanted_excel_files(output_folder, summary_file)
+        # Use BeautifulSoup to parse the HTML content
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Extract only the visible text from the page
+        page_text = soup.get_text(separator=' ')  # Using a space separator between elements
+
+        found_keywords = {}
+        for keyword in keywords:
+            # Search for the keyword in the page text (not HTML tags)
+            if re.search(rf"\b{keyword}\b", page_text, re.IGNORECASE):
+                found_keywords[keyword] = 1
+            else:
+                found_keywords[keyword] = 0
+
+        return found_keywords
+    except Exception as e:
+        print(f"Error fetching page {url}: {str(e)}")
+        return {}
+
+def crawl_and_search(url, keywords):
+    domain = requests.compat.urlparse(url).netloc
+    internal_links = get_internal_links(url, domain)
+
+    # Check if internal_links is None or a string indicating an error
+    if not internal_links or isinstance(internal_links, str):
+        print(f"Error retrieving internal links: {internal_links}")
+        return False  # Return False to indicate no keywords found
+
+    training_found = False
+    results = {}  # Dictionary to hold link status results
+
+    for link in internal_links:
+        keyword_results = search_keywords_in_page(link, keywords)
+        results[link] = keyword_results  # Store keyword results for each link
+
+        if any(keyword_results.values()):  # Check if any keyword was found
+            training_found = True  # Set this to True if any keywords are found
+
+    # Print the status of keyword presence for each link
+    for link, keyword_status in results.items():
+        print(f"{link}: {keyword_status}")
+
+    # Update flags based on whether training keywords were found
+    if training_found:
+        update_training_flag(gl_id=gl_id, niche=niche)
+        print(f"The website {url} is offering training based on keyword presence.")
+
+    return training_found  # Return whether training was found
+
+keywords_to_search = ['course', 'courses', 'training', 'event', 'seminar', 'workshop', 'class', 'classes']
+
+if __name__ == "__main__":
+
+    remaining_websites_count = get_remaining_websites_counts(niche)
+    while remaining_websites_count > 0:
+        result = crawl_and_search(url, keywords_to_search)
+        update_training_check_done_flag(gl_id=gl_id, niche=niche)  # Update once per website
+        remaining_websites_count = get_remaining_websites_counts(niche)
+        if remaining_websites_count > 0:
+            # Get the next website if available
+            data = get_website_from_db(niche)
+            url = data[0][1]
+            gl_id = data[0][0] 
