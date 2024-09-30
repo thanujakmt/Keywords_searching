@@ -79,22 +79,20 @@ def get_internal_links_selenium(url, domain):
         return set() 
 
 def get_internal_links(url, domain):
-    # if not check_website(url,id):
-    #     print("Website not accessible. Marking it as such after retries.")
-    #     update_website_error_flag(id=id, niche=niche)
-    #     return "Website not accessible."
-
     retries = 0
     while retries < 3:
         try:
             headers = get_headers()
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=20)  # Set a timeout here too
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 
             links = set()
             for a_tag in soup.find_all('a', href=True):
                 href = a_tag['href']
+                # Exclude mailto links and other unwanted extensions
+                if href.startswith('mailto:'):
+                    continue
                 if href.startswith('/') or domain in href:
                     full_url = requests.compat.urljoin(url, href)
                     if not any(full_url.endswith(ext) for ext in EXCLUDED_EXTENSIONS):
@@ -102,7 +100,7 @@ def get_internal_links(url, domain):
 
             print(f"Found internal links: {links}")
             return links
-        
+
         except requests.exceptions.RequestException as e:
             retries += 1
             print(f"Error fetching links (attempt {retries}/{3}): {str(e)}")
@@ -117,12 +115,12 @@ def get_internal_links(url, domain):
 def search_keywords_in_page(url, keywords):
     try:
         headers = get_headers()
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
+        response = requests.get(url, headers=headers, timeout=20)  # Set a timeout of 10 seconds
+        response.raise_for_status()  # Raise an error for bad responses
 
         soup = BeautifulSoup(response.text, 'html.parser')
         page_text = soup.get_text(separator=' ')
-
+        
         found_keywords = {}
         for keyword in keywords:
             if re.search(rf"\b{keyword}\b", page_text, re.IGNORECASE):
@@ -131,9 +129,15 @@ def search_keywords_in_page(url, keywords):
                 found_keywords[keyword] = 0
 
         return found_keywords
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred for {url}: {http_err}")
+    except requests.exceptions.ConnectionError as conn_err:
+        print(f"Connection error occurred for {url}: {conn_err}")
+    except requests.exceptions.Timeout:
+        print(f"Timeout occurred for {url}.")
     except Exception as e:
         print(f"Error fetching page {url}: {str(e)}")
-        return {}
+    return {}
 
 # Move process_link to a top-level function
 def process_link(args):
@@ -156,7 +160,7 @@ def crawl_and_search(url, keywords):
 
         if not internal_links:
             print("Failed to retrieve internal links using both methods.")
-            update_website_error_flag(id=id, niche=niche)
+            # update_website_error_flag(id=id, niche=niche)
             return False
 
     training_found = False
@@ -188,6 +192,7 @@ if __name__ == "__main__":
         if not check_website(url, id):
             print(f"Website {url} is not accessible. Skipping to the next website...")
             update_website_error_flag(id=id, niche=niche)
+            update_training_check_done_flag(id=id, niche=niche)
             # Update website error flag and fetch the next website, don't exit the loop
             data = get_website_from_db(niche)
             url = data[0][1]
