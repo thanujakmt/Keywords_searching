@@ -163,12 +163,12 @@ def crawl_and_search(url, keywords):
             update_website_error_flag(id=id, niche=niche)
             return False
 
-    # Collect found keywords count
-    total_found_keywords = 0
+    # Track distinct keywords found
+    distinct_keywords_found = set()
 
     # Check keywords in the main page content first
     main_page_keywords = search_keywords_in_page(url, keywords)
-    total_found_keywords += sum(main_page_keywords.values())
+    distinct_keywords_found.update([keyword for keyword, found in main_page_keywords.items() if found])
 
     # Proceed to check internal links only if not enough keywords found
     results = {}
@@ -177,18 +177,18 @@ def crawl_and_search(url, keywords):
 
     for link, keyword_status in result_list:
         results[link] = keyword_status
-        print(f"{link}: {keyword_status}")
-        total_found_keywords += sum(keyword_status.values())
+        distinct_keywords_found.update([keyword for keyword, found in keyword_status.items() if found])
 
-    print(f"Total keywords found in {url}: {total_found_keywords}")
+    print(f"Distinct keywords found in {url}: {distinct_keywords_found}")
 
-    # Only update the training flag if at least 3 keywords are found
-    if total_found_keywords >= 3:
+    # Only update the training flag if at least 3 distinct keywords are found
+    if len(distinct_keywords_found) >= 3:
         update_training_flag(id=id, niche=niche)
-        print(f"The website {url} is offering training based on keyword presence in links.")
+        print(f"The website {url} is offering training based on distinct keyword presence.")
         return True  # Indicating that training was found
 
-    return False  # No sufficient keywords found
+    return False  # No sufficient distinct keywords found
+
 
 # keywords_to_search = ['course', 'courses', 'training', 'event', 'seminar', 'workshop', 'class', 'classes']
 
