@@ -177,6 +177,7 @@ def crawl_and_search(url, keywords):
 
     for link, keyword_status in result_list:
         results[link] = keyword_status
+        print(f"{link}: {keyword_status}")
         distinct_keywords_found.update([keyword for keyword, found in keyword_status.items() if found])
 
     print(f"Distinct keywords found in {url}: {distinct_keywords_found}")
