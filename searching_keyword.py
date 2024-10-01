@@ -160,29 +160,44 @@ def crawl_and_search(url, keywords):
 
         if not internal_links:
             print("Failed to retrieve internal links using both methods.")
-            # update_website_error_flag(id=id, niche=niche)
+            update_website_error_flag(id=id, niche=niche)
             return False
 
-    training_found = False
-    results = {}
+    # Collect found keywords count
+    total_found_keywords = 0
 
-    # Use Pool for multiprocessing, passing link and keywords as args
+    # Check keywords in the main page content first
+    main_page_keywords = search_keywords_in_page(url, keywords)
+    total_found_keywords += sum(main_page_keywords.values())
+
+    # Proceed to check internal links only if not enough keywords found
+    results = {}
     with multiprocessing.Pool() as pool:
         result_list = pool.map(process_link, [(link, keywords) for link in internal_links])
 
     for link, keyword_status in result_list:
         results[link] = keyword_status
         print(f"{link}: {keyword_status}")
-        if any(keyword_status.values()):
-            training_found = True
+        total_found_keywords += sum(keyword_status.values())
 
-    if training_found:
+    print(f"Total keywords found in {url}: {total_found_keywords}")
+
+    # Only update the training flag if at least 3 keywords are found
+    if total_found_keywords >= 3:
         update_training_flag(id=id, niche=niche)
-        print(f"The website {url} is offering training based on keyword presence.")
+        print(f"The website {url} is offering training based on keyword presence in links.")
+        return True  # Indicating that training was found
 
-    return training_found
+    return False  # No sufficient keywords found
 
-keywords_to_search = ['course', 'courses', 'training', 'event', 'seminar', 'workshop', 'class', 'classes']
+# keywords_to_search = ['course', 'courses', 'training', 'event', 'seminar', 'workshop', 'class', 'classes']
+
+keywords_to_search = [
+    "training", "courses", "workshop", "seminar", "class",
+    "certification", "program", "professional development",
+    "e-learning", "online courses", "bootcamp", "skill development",
+    "learning platform", "virtual learning", "education", "enrollment","event","learn","classes","course"
+]
 
 if __name__ == "__main__":
     remaining_websites_count = get_remaining_websites_counts(niche)
